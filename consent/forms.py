@@ -7,6 +7,7 @@ class PrivilegeForm(forms.ModelForm):
 
     class Meta:
         model = Privilege
+        fields = ('name', 'description', 'users')
 
 
 class ConsentForm(forms.Form):

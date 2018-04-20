@@ -6,10 +6,12 @@ has been granted, the user is able to revoke the consent.
 """
 from datetime import datetime
 
+from django.conf import settings
 from django.db import models
-from django.contrib.auth.models import User
+from django.utils.encoding import python_2_unicode_compatible
 
 
+@python_2_unicode_compatible
 class Privilege(models.Model):
     """
     A privilage is a permission that the website asks from the user. This
@@ -18,12 +20,12 @@ class Privilege(models.Model):
     """
     name = models.CharField(max_length=64)
     description = models.TextField()
-    users = models.ManyToManyField(User, through='consent.Consent')
+    users = models.ManyToManyField(settings.AUTH_USER_MODEL, through='consent.Consent')
 
     class Meta:
         ordering = ['name', ]
 
-    def __unicode__(self):
+    def __str__(self):
         return self.name
 
     def is_granted_by(self, user):
@@ -33,6 +35,7 @@ class Privilege(models.Model):
         return False
 
 
+@python_2_unicode_compatible
 class ConsentManager(models.Manager):
     """
     The ConsentManager adds a number of utility methods to the Consent.objects
@@ -99,8 +102,8 @@ class Consent(models.Model):
     Consent is the agreement from a user to grant a specific privilege. This
     can then be revoked by the user at a later date.
     """
-    user = models.ForeignKey(User)
-    privilege = models.ForeignKey(Privilege)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    privilege = models.ForeignKey(Privilege, on_delete=models.CASCADE)
     granted_on = models.DateTimeField(default=datetime.now)
     revoked_on = models.DateTimeField(null=True, blank=True)
     revoked = models.BooleanField(default=False)
@@ -145,7 +148,7 @@ class Consent(models.Model):
         """
         return not self.is_granted
 
-    def __unicode__(self):
+    def __str__(self):
 
         if not self.revoked:
             adjv = 'permits'
