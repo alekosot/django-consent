@@ -4,10 +4,14 @@ A privilage is added to the website normally in the Django admin and then a
 user has the option of granting the consent to to the website. After Consent
 has been granted, the user is able to revoke the consent.
 """
-from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.db import models
-from django.utils.encoding import python_2_unicode_compatible
 from django.utils import timezone
+from django.utils.encoding import python_2_unicode_compatible
+from django.utils.translation import ugettext_lazy as _
+
+
+User = get_user_model()
 
 
 @python_2_unicode_compatible
@@ -19,10 +23,13 @@ class Privilege(models.Model):
     """
     name = models.CharField(max_length=64)
     description = models.TextField()
-    users = models.ManyToManyField(settings.AUTH_USER_MODEL, through='consent.Consent')
+    users = models.ManyToManyField(User, through='consent.Consent')
 
     class Meta:
+        default_related_name = 'privileges'
         ordering = ['name', ]
+        verbose_name = _('privilege')
+        verbose_name_plural = _('privileges')
 
     def __str__(self):
         return self.name
@@ -101,7 +108,7 @@ class Consent(models.Model):
     Consent is the agreement from a user to grant a specific privilege. This
     can then be revoked by the user at a later date.
     """
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     privilege = models.ForeignKey(Privilege, on_delete=models.CASCADE)
     granted_on = models.DateTimeField(default=timezone.now)
     revoked_on = models.DateTimeField(null=True, blank=True)
@@ -111,7 +118,10 @@ class Consent(models.Model):
 
     class Meta:
         unique_together = ('user', 'privilege',)
+        default_related_name = 'consents'
         ordering = ['privilege__name', ]
+        verbose_name = _('consent')
+        verbose_name_plural = _('consents')
 
     def revoke(self):
         """
