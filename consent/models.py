@@ -4,11 +4,10 @@ A privilage is added to the website normally in the Django admin and then a
 user has the option of granting the consent to to the website. After Consent
 has been granted, the user is able to revoke the consent.
 """
-from datetime import datetime
-
 from django.conf import settings
 from django.db import models
 from django.utils.encoding import python_2_unicode_compatible
+from django.utils import timezone
 
 
 @python_2_unicode_compatible
@@ -65,7 +64,7 @@ class ConsentManager(models.Manager):
         Revoke an QuerySet (or iterable) of privileges for a specifiv user.
         """
         Consent.objects.filter(user=user, privilege__in=privileges).update(
-                revoked=True, revoked_on=datetime.now())
+                revoked=True, revoked_on=timezone.now())
 
     def granted(self, user=None):
         """
@@ -104,7 +103,7 @@ class Consent(models.Model):
     """
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     privilege = models.ForeignKey(Privilege, on_delete=models.CASCADE)
-    granted_on = models.DateTimeField(default=datetime.now)
+    granted_on = models.DateTimeField(default=timezone.now)
     revoked_on = models.DateTimeField(null=True, blank=True)
     revoked = models.BooleanField(default=False)
 
@@ -121,7 +120,7 @@ class Consent(models.Model):
         """
         if not self.revoked:
             self.revoked = True
-            self.revoked_on = datetime.now()
+            self.revoked_on = timezone.now()
 
     def grant(self):
         """
@@ -130,7 +129,7 @@ class Consent(models.Model):
         if self.revoked:
             self.revoked = False
             self.revoked_on = None
-            self.granted_on = datetime.now()
+            self.granted_on = timezone.now()
 
     @property
     def is_granted(self):
