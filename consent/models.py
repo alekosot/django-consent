@@ -34,7 +34,6 @@ class Privilege(models.Model):
         return False
 
 
-@python_2_unicode_compatible
 class ConsentManager(models.Manager):
     """
     The ConsentManager adds a number of utility methods to the Consent.objects
@@ -96,6 +95,7 @@ class ConsentManager(models.Manager):
         return None
 
 
+@python_2_unicode_compatible
 class Consent(models.Model):
     """
     Consent is the agreement from a user to grant a specific privilege. This
