@@ -6,6 +6,7 @@ something) has the option of granting its consent to the use of that
 """
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 from django.utils.encoding import python_2_unicode_compatible
@@ -137,7 +138,7 @@ class Consent(models.Model):
 
     privilege = models.ForeignKey(Privilege, on_delete=models.CASCADE)
 
-    granted_on = models.DateTimeField(default=timezone.now)
+    granted_on = models.DateTimeField()
     revoked_on = models.DateTimeField(null=True, blank=True)
     revoked = models.BooleanField(default=False)
 
@@ -150,37 +151,6 @@ class Consent(models.Model):
         verbose_name = _('consent')
         verbose_name_plural = _('consents')
 
-    def revoke(self):
-        """
-        Revoke this object's `Consent` for this `Privilege`.
-        """
-        if not self.revoked:
-            self.revoked = True
-            self.revoked_on = timezone.now()
-
-    def grant(self):
-        """
-        Grant the Consent for this `Privilege` as granted.
-        """
-        if self.revoked:
-            self.revoked = False
-            self.revoked_on = None
-            self.granted_on = timezone.now()
-
-    @property
-    def is_granted(self):
-        """
-        Return True if this consent has not been revoked or False otherwise.
-        """
-        return not self.revoked
-
-    @property
-    def is_revoked(self):
-        """
-        Return `True` if this consent has been revoked or `False` otherwise.
-        """
-        return not self.is_granted
-
     def __str__(self):
 
         if not self.revoked:
@@ -188,6 +158,41 @@ class Consent(models.Model):
         else:
             adjv = 'revoked'
 
-        return "%s %s the '%s' privilege".format(
+        return "{} {} the '{}' privilege".format(
             self.content_object, adjv, self.privilege
         )
+
+    def clean(self):
+        super().clean()
+        if not self.granted_on and not self.revoked_on:
+            raise ValidationError(
+                _('You have to provide a revocation or grant date.'))
+
+    def revoke(self):
+        """
+        Revoke this object's `Consent` for this `Privilege`.
+        """
+        self.revoked = True
+        self.revoked_on = timezone.now()
+
+    def grant(self):
+        """
+        Grant the Consent for this `Privilege` as granted.
+        """
+        self.revoked = False
+        self.revoked_on = None
+        self.granted_on = timezone.now()
+
+    @property
+    def is_granted(self):
+        """
+        Return True if this consent has not been revoked or False otherwise.
+        """
+        return self.granted_on > self.revoked_on if self.granted_on else False
+
+    @property
+    def is_revoked(self):
+        """
+        Return `True` if this consent has been revoked or `False` otherwise.
+        """
+        return not self.is_granted
