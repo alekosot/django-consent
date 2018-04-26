@@ -8,7 +8,9 @@ class PrivilegeAdmin(admin.ModelAdmin):
 
 
 class ConsentAdmin(admin.ModelAdmin):
-    list_display = ('user', 'privilege', 'granted_on', 'revoked_on', )
+    list_display = (
+        'content_object', 'privilege', 'granted_on', 'revoked_on',
+    )
     list_filter = ('privilege', 'revoked', )
 
 
