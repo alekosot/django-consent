@@ -4,12 +4,17 @@ A privilage is added to the website normally in the Django admin and then a
 user has the option of granting the consent to to the website. After Consent
 has been granted, the user is able to revoke the consent.
 """
-from datetime import datetime
-
+from django.contrib.auth import get_user_model
 from django.db import models
-from django.contrib.auth.models import User
+from django.utils import timezone
+from django.utils.encoding import python_2_unicode_compatible
+from django.utils.translation import ugettext_lazy as _
 
 
+User = get_user_model()
+
+
+@python_2_unicode_compatible
 class Privilege(models.Model):
     """
     A privilage is a permission that the website asks from the user. This
@@ -21,9 +26,12 @@ class Privilege(models.Model):
     users = models.ManyToManyField(User, through='consent.Consent')
 
     class Meta:
+        default_related_name = 'privileges'
         ordering = ['name', ]
+        verbose_name = _('privilege')
+        verbose_name_plural = _('privileges')
 
-    def __unicode__(self):
+    def __str__(self):
         return self.name
 
     def is_granted_by(self, user):
@@ -62,7 +70,7 @@ class ConsentManager(models.Manager):
         Revoke an QuerySet (or iterable) of privileges for a specifiv user.
         """
         Consent.objects.filter(user=user, privilege__in=privileges).update(
-                revoked=True, revoked_on=datetime.now())
+                revoked=True, revoked_on=timezone.now())
 
     def granted(self, user=None):
         """
@@ -94,14 +102,15 @@ class ConsentManager(models.Manager):
         return None
 
 
+@python_2_unicode_compatible
 class Consent(models.Model):
     """
     Consent is the agreement from a user to grant a specific privilege. This
     can then be revoked by the user at a later date.
     """
-    user = models.ForeignKey(User)
-    privilege = models.ForeignKey(Privilege)
-    granted_on = models.DateTimeField(default=datetime.now)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    privilege = models.ForeignKey(Privilege, on_delete=models.CASCADE)
+    granted_on = models.DateTimeField(default=timezone.now)
     revoked_on = models.DateTimeField(null=True, blank=True)
     revoked = models.BooleanField(default=False)
 
@@ -109,7 +118,10 @@ class Consent(models.Model):
 
     class Meta:
         unique_together = ('user', 'privilege',)
+        default_related_name = 'consents'
         ordering = ['privilege__name', ]
+        verbose_name = _('consent')
+        verbose_name_plural = _('consents')
 
     def revoke(self):
         """
@@ -118,7 +130,7 @@ class Consent(models.Model):
         """
         if not self.revoked:
             self.revoked = True
-            self.revoked_on = datetime.now()
+            self.revoked_on = timezone.now()
 
     def grant(self):
         """
@@ -127,7 +139,7 @@ class Consent(models.Model):
         if self.revoked:
             self.revoked = False
             self.revoked_on = None
-            self.granted_on = datetime.now()
+            self.granted_on = timezone.now()
 
     @property
     def is_granted(self):
@@ -145,7 +157,7 @@ class Consent(models.Model):
         """
         return not self.is_granted
 
-    def __unicode__(self):
+    def __str__(self):
 
         if not self.revoked:
             adjv = 'permits'
