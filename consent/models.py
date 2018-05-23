@@ -141,6 +141,10 @@ class Consent(models.Model):
     revoked_on = models.DateTimeField(null=True, blank=True)
     revoked = models.BooleanField(default=False)
 
+    notes = models.TextField(blank=True, help_text=_(
+        'You can use this to keep notes of how the consent was granted, '
+        'such as the actual text that was used to ask for consent.'))
+
     objects = ConsentManager()
 
     class Meta:
