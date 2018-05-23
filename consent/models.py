@@ -1,29 +1,27 @@
 """
-There are two key models in the Consent app. These are Privilege and Consent.
-A privilage is added to the website normally in the Django admin and then a
-user has the option of granting the consent to to the website. After Consent
-has been granted, the user is able to revoke the consent.
+There are two key models in the Consent app. These are `Privilege` and
+`Consent`. A `Privilege` is created for the website/app and then someone (or
+something) has the option of granting its consent to the use of that
+`Privilege`. After the `Consent` has been granted, it can also be revoked.
 """
-from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.utils import timezone
 from django.utils.encoding import python_2_unicode_compatible
 from django.utils.translation import ugettext_lazy as _
 
 
-User = get_user_model()
-
-
 @python_2_unicode_compatible
 class Privilege(models.Model):
     """
-    A privilage is a permission that the website asks from the user. This
-    could be the permission to email them, share the users details or to use
-    their (already authorised) social netorking sites.
+    A privilege is a permission that the project asks for from something.
+
+    For example, `Prilivege`s could be the permission to send newsletters to
+    a subscriber or the permission to share a user's details.
     """
     name = models.CharField(max_length=64)
     description = models.TextField()
-    users = models.ManyToManyField(User, through='consent.Consent')
 
     class Meta:
         default_related_name = 'privileges'
@@ -47,49 +45,70 @@ class ConsentManager(models.Manager):
     interface to help with common tasks and functions.
     """
 
+    def _get_content_type_params(obj):
+        return {
+            'content_type': ContentType.objects.get_for_model(obj),
+            'object_id': obj.id
+        }
+
+    def for_object(self, obj):
+        """
+        Return the Consent instances for a given object.
+        """
+        kwargs = self._get_content_type_params(obj)
+        return Consent.objects.filter(**kwargs)
+
     def for_user(self, user):
         """
         Return the Consent instances for a given user.
-        """
-        return Consent.objects.filter(user=user)
 
-    def grant_consent(self, user, privileges):
+        This exists for backwards compatibility only.
         """
-        Grant an QuerySet (or iterable) of privileges for a specifiv user.
+        return self.for_object(user)
+
+    def grant_consent(self, obj, privileges):
         """
+        Grant an QuerySet (or iterable) of privileges for a specific object.
+        """
+        kwargs = self._get_content_type_params(obj)
         for privilege in privileges:
-            consent, created = Consent.objects.get_or_create(
-                user=user, privilege=privilege)
+            consent, created = Consent.objects  \
+                .get_or_create(privilege=privilege, **kwargs)
             if not created:
                 consent.revoked = False
                 consent.revoked_on = None
                 consent.save()
 
-    def revoke_consent(self, user, privileges):
+    def revoke_consent(self, obj, privileges):
         """
-        Revoke an QuerySet (or iterable) of privileges for a specifiv user.
+        Revoke an QuerySet (or iterable) of privileges for a specific object.
         """
-        Consent.objects.filter(user=user, privilege__in=privileges).update(
-                revoked=True, revoked_on=timezone.now())
+        ctype = ContentType.objects.get_for_model(obj)
+        Consent.objects  \
+            .filter(content_type=ctype,
+                    object_id=obj.id,
+                    privilege__in=privileges)  \
+            .update(revoked=True,
+                    revoked_on=timezone.now())
 
-    def granted(self, user=None):
+    def granted(self, obj=None):
         """
-        Return all of the granted consents either for all users or the given
-        user.
+        Return all of the granted consents for all objects or the given one.
         """
         granted_consents = self.filter(revoked=False)
-        if user:
-            granted_consents = granted_consents.filter(user=user)
+        if obj:
+            kwargs = self._get_content_type_params(obj)
+            granted_consents = granted_consents.filter(**kwargs)
         return granted_consents
 
-    def revoked(self, user=None):
+    def revoked(self, obj=None):
         """
-        Return all of the revoked consents either for all the users or the
-        given user.
+        Return all of the revoked consents for all objects or the given one.
         """
         revoked_consents = self.filter(revoked=True)
-        if user:
-            revoked_consents = revoked_consents.filter(user=user)
+        if obj:
+            kwargs = self._get_content_type_params(obj)
+            revoked_consents = revoked_consents.filter(**kwargs)
         return revoked_consents
 
     def get_or_none(self, *args, **kwargs):
@@ -105,11 +124,19 @@ class ConsentManager(models.Manager):
 @python_2_unicode_compatible
 class Consent(models.Model):
     """
-    Consent is the agreement from a user to grant a specific privilege. This
-    can then be revoked by the user at a later date.
-    """
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    Consent is the grant or forbiddance of a specific `Privilege`.
+    Usually, the one granting consent is a user, however this is not
+    enforced and anything (ie any `Model`) can grant `Consent`, via a
+    `generic relation`_.
+
+    .. _generic relation: https://docs.djangoproject.com/en/stable/ref/contrib/contenttypes/#generic-relations
+    """  # NOQA
+    granter_ctype = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    granter_id = models.PositiveIntegerField()
+    granter = GenericForeignKey('granter_ctype', 'granter_id')
+
     privilege = models.ForeignKey(Privilege, on_delete=models.CASCADE)
+
     granted_on = models.DateTimeField(default=timezone.now)
     revoked_on = models.DateTimeField(null=True, blank=True)
     revoked = models.BooleanField(default=False)
@@ -117,7 +144,7 @@ class Consent(models.Model):
     objects = ConsentManager()
 
     class Meta:
-        unique_together = ('user', 'privilege',)
+        unique_together = ('granter_ctype', 'granter_id', 'privilege')
         default_related_name = 'consents'
         ordering = ['privilege__name', ]
         verbose_name = _('consent')
@@ -125,8 +152,7 @@ class Consent(models.Model):
 
     def revoke(self):
         """
-        Revoke the users consent for the Privilege if it has not already been
-        revoked.
+        Revoke this object's `Consent` for this `Privilege`.
         """
         if not self.revoked:
             self.revoked = True
@@ -134,7 +160,7 @@ class Consent(models.Model):
 
     def grant(self):
         """
-        Grant the users consent for the Privilege if it has been revoked.
+        Grant the Consent for this `Privilege` as granted.
         """
         if self.revoked:
             self.revoked = False
@@ -144,16 +170,14 @@ class Consent(models.Model):
     @property
     def is_granted(self):
         """
-        Returns True if this consent has not been revoked by the user.
-        Otherwise False is returned.
+        Return True if this consent has not been revoked or False otherwise.
         """
         return not self.revoked
 
     @property
     def is_revoked(self):
         """
-        returns True if this consent has been revoked by the user.
-        Otherwise False is returned.
+        Return `True` if this consent has been revoked or `False` otherwise.
         """
         return not self.is_granted
 
@@ -164,4 +188,6 @@ class Consent(models.Model):
         else:
             adjv = 'revoked'
 
-        return "%s %s the '%s' privilege" % (self.user, adjv, self.privilege)
+        return "{} {} the '{}' privilege".format(
+            self.granter, adjv, self.privilege
+        )
