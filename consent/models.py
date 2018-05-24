@@ -4,7 +4,7 @@ There are two key models in the Consent app. These are `Privilege` and
 something) has the option of granting its consent to the use of that
 `Privilege`. After the `Consent` has been granted, it can also be revoked.
 """
-from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.generic import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.utils import timezone
@@ -24,7 +24,7 @@ class Privilege(models.Model):
     description = models.TextField()
 
     class Meta:
-        default_related_name = 'privileges'
+        # default_related_name = 'privileges'
         ordering = ['name', ]
         verbose_name = _('privilege')
         verbose_name_plural = _('privileges')
@@ -149,7 +149,7 @@ class Consent(models.Model):
 
     class Meta:
         unique_together = ('granter_ctype', 'granter_id', 'privilege')
-        default_related_name = 'consents'
+        # default_related_name = 'consents'
         ordering = ['privilege__name', ]
         verbose_name = _('consent')
         verbose_name_plural = _('consents')
