@@ -10,3 +10,4 @@ MANIFEST
 Vagrantfile
 .tox/
 *.db
+.vim
