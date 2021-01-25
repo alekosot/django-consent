@@ -8,11 +8,9 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.utils import timezone
-from django.utils.encoding import python_2_unicode_compatible
 from django.utils.translation import ugettext_lazy as _
 
 
-@python_2_unicode_compatible
 class Privilege(models.Model):
     """
     A privilege is a permission that the project asks for from something.
@@ -121,7 +119,6 @@ class ConsentManager(models.Manager):
         return None
 
 
-@python_2_unicode_compatible
 class Consent(models.Model):
     """
     Consent is the grant or forbiddance of a specific `Privilege`.
